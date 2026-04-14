@@ -15,8 +15,10 @@ public class RedisConfig {
     @Bean
     public RedisCacheConfiguration redisCacheConfiguration() {
         ObjectMapper objectMapper = JsonMapper.builder()
-                .findAndAddModules()
+                .addModule(new JavaTimeModule())
                 .build();
+
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         return RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMinutes(10))
