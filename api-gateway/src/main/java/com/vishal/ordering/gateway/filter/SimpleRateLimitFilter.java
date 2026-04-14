@@ -48,7 +48,7 @@ public class SimpleRateLimitFilter extends OncePerRequestFilter {
 
         int requestCount = window.counter().incrementAndGet();
         if (requestCount > maxRequestsPerMinute) {
-            response.setStatus(HttpServletResponse.SC_TOO_MANY_REQUESTS);
+            response.setStatus(429);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.getWriter().write("""
                     {"message":"Rate limit exceeded. Try again in a minute."}
