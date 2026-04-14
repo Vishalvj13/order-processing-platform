@@ -1,0 +1,136 @@
+version: "3.9"
+
+services:
+  kafka:
+    image: bitnami/kafka:4.0.0
+    container_name: kafka
+    ports:
+      - "9094:9094"
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+
+  order-postgres:
+    image: postgres:16-alpine
+    container_name: order-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - order-postgres-data:/var/lib/postgresql/data
+
+  inventory-postgres:
+    image: postgres:16-alpine
+    container_name: inventory-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - inventory-postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    restart: on-failure
+    depends_on:
+      - order-service
+      - inventory-service
+      - notification-service
+    environment:
+      APP_API_KEY: dev-api-key
+      ORDER_SERVICE_URL: http://order-service:8081
+      INVENTORY_SERVICE_URL: http://inventory-service:8082
+      NOTIFICATION_SERVICE_URL: http://notification-service:8084
+
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.order-service
+    container_name: order-service
+    ports:
+      - "8081:8081"
+    restart: on-failure
+    depends_on:
+      - order-postgres
+      - kafka
+      - redis
+    environment:
+      ORDER_DB_URL: jdbc:postgresql://order-postgres:5432/order_db
+      ORDER_DB_USERNAME: postgres
+      ORDER_DB_PASSWORD: postgres
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.inventory-service
+    container_name: inventory-service
+    ports:
+      - "8082:8082"
+    restart: on-failure
+    depends_on:
+      - inventory-postgres
+      - kafka
+    environment:
+      INVENTORY_DB_URL: jdbc:postgresql://inventory-postgres:5432/inventory_db
+      INVENTORY_DB_USERNAME: postgres
+      INVENTORY_DB_PASSWORD: postgres
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.payment-service
+    container_name: payment-service
+    ports:
+      - "8083:8083"
+    restart: on-failure
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      APP_PAYMENT_MAX_SUCCESS_AMOUNT: 1000.00
+      APP_PAYMENT_PROCESSING_DELAY_MS: 500
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.notification-service
+    container_name: notification-service
+    ports:
+      - "8084:8084"
+    restart: on-failure
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+volumes:
+  order-postgres-data:
+  inventory-postgres-data:
