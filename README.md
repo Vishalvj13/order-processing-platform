@@ -170,11 +170,3 @@ If you prefer running services from your IDE:
 1. Start Kafka, Redis, and Postgres only from `docker-compose.yml`.
 2. Run each Spring Boot service from IntelliJ.
 3. Default `application.yml` files already point to localhost-based ports.
-
-## Suggested next upgrades
-
-- replace API key auth with JWT
-- add OpenTelemetry tracing
-- use the outbox pattern
-- add GitHub Actions CI/CD
-- deploy the same stack to EKS
